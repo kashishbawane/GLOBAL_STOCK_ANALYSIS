@@ -6,12 +6,14 @@ import plotly.express as px
 from sklearn.linear_model import LinearRegression
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
+from streamlit_lottie import st_lottie
+import requests
 import time
 
 st.set_page_config(page_title="Global Inequality", layout="wide")
 
 # ===============================
-# LOGIN SYSTEM
+# LOGIN
 # ===============================
 if "login" not in st.session_state:
     st.session_state.login = False
@@ -25,24 +27,36 @@ if not st.session_state.login:
         if user == "admin" and pwd == "1234":
             st.session_state.login = True
         else:
-            st.error("Wrong credentials")
+            st.error("Invalid credentials")
     st.stop()
 
 # ===============================
-# UI
+# LOAD LOTTIE
 # ===============================
-st.markdown("<h1 style='text-align:center;'>🌍 Global Inequality Dashboard</h1>", unsafe_allow_html=True)
+def load_lottie(url):
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    return r.json()
+
+# ===============================
+# ANIMATION
+# ===============================
+lottie = load_lottie("https://assets2.lottiefiles.com/packages/lf20_jcikwtux.json")
+st_lottie(lottie, height=200)
+
+st.markdown("<h1 style='text-align:center;'>🌍 Global Income Inequality Dashboard</h1>", unsafe_allow_html=True)
 
 # ===============================
 # LOAD DATA
 # ===============================
 @st.cache_data
-def load():
+def load_data():
     return pd.read_excel("WIID_19Dec2018.xlsx")
 
-with st.spinner("Loading..."):
+with st.spinner("Loading data..."):
     time.sleep(1)
-    df = load()
+    df = load_data()
 
 df = df[['country','year','gini_reported','region_wb',
          'incomegroup','gdp_ppp_pc_usd2011','population']]
@@ -50,19 +64,43 @@ df = df[['country','year','gini_reported','region_wb',
 df = df.dropna(subset=['gini_reported'])
 
 # ===============================
+# DOWNLOAD
+# ===============================
+st.download_button("📥 Download Data", df.to_csv(index=False), "data.csv")
+
+# ===============================
 # KPI
 # ===============================
 c1,c2,c3 = st.columns(3)
-c1.metric("Avg", round(df.gini_reported.mean(),2))
-c2.metric("Max", round(df.gini_reported.max(),2))
-c3.metric("Min", round(df.gini_reported.min(),2))
+c1.metric("Avg Inequality", round(df.gini_reported.mean(),2))
+c2.metric("Max Inequality", round(df.gini_reported.max(),2))
+c3.metric("Min Inequality", round(df.gini_reported.min(),2))
 
 # ===============================
-# NAV
+# AI CHATBOT
+# ===============================
+st.sidebar.markdown("## 🤖 AI Assistant")
+question = st.sidebar.text_input("Ask about data")
+
+if question:
+    if "average" in question.lower():
+        st.sidebar.write("Average inequality:", round(df.gini_reported.mean(),2))
+    elif "highest" in question.lower():
+        st.sidebar.write(df.loc[df.gini_reported.idxmax()])
+    elif "lowest" in question.lower():
+        st.sidebar.write(df.loc[df.gini_reported.idxmin()])
+    elif "gdp" in question.lower():
+        st.sidebar.write("GDP has weak relation with inequality")
+    else:
+        st.sidebar.write("Ask about average, highest, lowest, GDP")
+
+# ===============================
+# NAVIGATION
 # ===============================
 opt = st.sidebar.radio("Menu",[
     "Overview","Global","Regional","GDP",
-    "Income","Trend","Population","Map","ML Prediction","Report"
+    "Income","Trend","Population","Map",
+    "ML Prediction","Report"
 ])
 
 # ===============================
@@ -111,7 +149,8 @@ elif opt=="Trend":
 # POPULATION
 # ===============================
 elif opt=="Population":
-    fig = px.scatter(df,x='population',y='gini_reported',size='population')
+    fig = px.scatter(df,x='population',y='gini_reported',
+                     size='population',color='region_wb')
     st.plotly_chart(fig)
 
 # ===============================
@@ -125,7 +164,7 @@ elif opt=="Map":
     st.plotly_chart(fig)
 
 # ===============================
-# 🤖 ML PREDICTION
+# ML PREDICTION
 # ===============================
 elif opt=="ML Prediction":
     st.subheader("Predict Inequality")
@@ -145,24 +184,23 @@ elif opt=="ML Prediction":
         st.success(f"Predicted Inequality: {round(pred[0],2)}")
 
 # ===============================
-# 📊 AUTO INSIGHTS + PDF
+# REPORT + SMART INSIGHTS
 # ===============================
 elif opt=="Report":
-    st.subheader("Auto Insights")
+    st.subheader("Smart Insights")
 
     avg = round(df.gini_reported.mean(),2)
-    mx = round(df.gini_reported.max(),2)
-    mn = round(df.gini_reported.min(),2)
+    mx = df.loc[df.gini_reported.idxmax(), 'country']
+    mn = df.loc[df.gini_reported.idxmin(), 'country']
 
     text = f"""
-    Global income inequality analysis shows that average inequality is {avg}.
-    Maximum inequality is {mx} and minimum is {mn}.
-    Inequality varies across countries and regions and is not directly dependent on GDP or population.
+    Average inequality is {avg}.
+    Highest inequality country is {mx}.
+    Lowest inequality country is {mn}.
     """
 
     st.write(text)
 
-    # PDF
     if st.button("Download PDF"):
         doc = SimpleDocTemplate("report.pdf")
         styles = getSampleStyleSheet()
