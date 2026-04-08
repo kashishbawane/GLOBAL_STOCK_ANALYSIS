@@ -3,35 +3,46 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
+from sklearn.linear_model import LinearRegression
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+import time
 
 st.set_page_config(page_title="Global Inequality", layout="wide")
 
 # ===============================
-# DARK MODE TOGGLE
+# LOGIN SYSTEM
 # ===============================
-dark_mode = st.sidebar.toggle("🌙 Dark Mode")
+if "login" not in st.session_state:
+    st.session_state.login = False
 
-if dark_mode:
-    st.markdown("""
-    <style>
-    body {background-color: #0e1117; color: white;}
-    .card {background-color: #1c1f26; color: white;}
-    </style>
-    """, unsafe_allow_html=True)
+if not st.session_state.login:
+    st.title("🔐 Login")
+    user = st.text_input("Username")
+    pwd = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if user == "admin" and pwd == "1234":
+            st.session_state.login = True
+        else:
+            st.error("Wrong credentials")
+    st.stop()
 
 # ===============================
-# TITLE
+# UI
 # ===============================
-st.markdown("<h1 style='text-align:center;'>🌍 Global Income Inequality Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center;'>🌍 Global Inequality Dashboard</h1>", unsafe_allow_html=True)
 
 # ===============================
 # LOAD DATA
 # ===============================
 @st.cache_data
-def load_data():
+def load():
     return pd.read_excel("WIID_19Dec2018.xlsx")
 
-df = load_data()
+with st.spinner("Loading..."):
+    time.sleep(1)
+    df = load()
 
 df = df[['country','year','gini_reported','region_wb',
          'incomegroup','gdp_ppp_pc_usd2011','population']]
@@ -39,123 +50,124 @@ df = df[['country','year','gini_reported','region_wb',
 df = df.dropna(subset=['gini_reported'])
 
 # ===============================
-# DOWNLOAD BUTTON
+# KPI
 # ===============================
-st.download_button("📥 Download Data", df.to_csv(index=False), "data.csv")
+c1,c2,c3 = st.columns(3)
+c1.metric("Avg", round(df.gini_reported.mean(),2))
+c2.metric("Max", round(df.gini_reported.max(),2))
+c3.metric("Min", round(df.gini_reported.min(),2))
 
 # ===============================
-# FILTERS
+# NAV
 # ===============================
-country = st.sidebar.selectbox("Country", ["All"] + list(df.country.unique()))
-year = st.sidebar.selectbox("Year", ["All"] + sorted(df.year.dropna().unique()))
-
-if country != "All":
-    df = df[df.country == country]
-
-if year != "All":
-    df = df[df.year == year]
-
-# ===============================
-# KPI CARDS
-# ===============================
-col1, col2, col3 = st.columns(3)
-
-col1.metric("Avg Inequality", round(df.gini_reported.mean(),2))
-col2.metric("Max Inequality", round(df.gini_reported.max(),2))
-col3.metric("Min Inequality", round(df.gini_reported.min(),2))
-
-# ===============================
-# NAVIGATION
-# ===============================
-option = st.sidebar.radio("Analysis", [
-    "Overview","Global","Regional","GDP","Income Group","Trend","Population","World Map"
+opt = st.sidebar.radio("Menu",[
+    "Overview","Global","Regional","GDP",
+    "Income","Trend","Population","Map","ML Prediction","Report"
 ])
 
 # ===============================
 # OVERVIEW
 # ===============================
-if option == "Overview":
+if opt=="Overview":
     st.dataframe(df.head())
-    st.info("Dataset shows global income inequality patterns.")
 
 # ===============================
 # GLOBAL
 # ===============================
-elif option == "Global":
+elif opt=="Global":
     top = df.groupby('country')['gini_reported'].mean().nlargest(10)
-
-    fig, ax = plt.subplots()
-    top.plot(kind='bar', ax=ax)
-
-    st.pyplot(fig)
-    st.success("Top countries show high inequality gaps.")
+    st.bar_chart(top)
 
 # ===============================
 # REGIONAL
 # ===============================
-elif option == "Regional":
+elif opt=="Regional":
     region = df.groupby('region_wb')['gini_reported'].mean()
-
-    fig, ax = plt.subplots()
-    sns.barplot(x=region.index, y=region.values, ax=ax)
-    plt.xticks(rotation=45)
-
-    st.pyplot(fig)
+    st.bar_chart(region)
 
 # ===============================
 # GDP
 # ===============================
-elif option == "GDP":
-    fig = px.scatter(df, x='gdp_ppp_pc_usd2011', y='gini_reported',
-                     color='region_wb',
-                     title="GDP vs Inequality")
+elif opt=="GDP":
+    fig = px.scatter(df,x='gdp_ppp_pc_usd2011',y='gini_reported',
+                     color='region_wb',animation_frame='year')
     st.plotly_chart(fig)
 
 # ===============================
-# INCOME GROUP
+# INCOME
 # ===============================
-elif option == "Income Group":
+elif opt=="Income":
     inc = df.groupby('incomegroup')['gini_reported'].mean()
-
-    fig, ax = plt.subplots()
-    sns.barplot(x=inc.index, y=inc.values, ax=ax)
-    plt.xticks(rotation=45)
-
-    st.pyplot(fig)
+    st.bar_chart(inc)
 
 # ===============================
-# TREND (ANIMATED)
+# TREND
 # ===============================
-elif option == "Trend":
-    trend = df.groupby(['year'])['gini_reported'].mean().reset_index()
-
-    fig = px.line(trend, x='year', y='gini_reported',
-                  title="Global Inequality Trend Over Time")
-
-    st.plotly_chart(fig)
+elif opt=="Trend":
+    trend = df.groupby('year')['gini_reported'].mean()
+    st.line_chart(trend)
 
 # ===============================
 # POPULATION
 # ===============================
-elif option == "Population":
-    fig = px.scatter(df, x='population', y='gini_reported',
-                     size='population', color='region_wb')
-
+elif opt=="Population":
+    fig = px.scatter(df,x='population',y='gini_reported',size='population')
     st.plotly_chart(fig)
 
 # ===============================
-# WORLD MAP 🌍
+# MAP
 # ===============================
-elif option == "World Map":
+elif opt=="Map":
     map_df = df.groupby('country')['gini_reported'].mean().reset_index()
-
-    fig = px.choropleth(
-        map_df,
-        locations="country",
-        locationmode="country names",
-        color="gini_reported",
-        title="Global Inequality Map",
-        color_continuous_scale="Reds"
-    )
-
+    fig = px.choropleth(map_df,locations="country",
+                        locationmode="country names",
+                        color="gini_reported")
     st.plotly_chart(fig)
+
+# ===============================
+# 🤖 ML PREDICTION
+# ===============================
+elif opt=="ML Prediction":
+    st.subheader("Predict Inequality")
+
+    df2 = df.dropna(subset=['gdp_ppp_pc_usd2011'])
+
+    X = df2[['gdp_ppp_pc_usd2011']]
+    y = df2['gini_reported']
+
+    model = LinearRegression()
+    model.fit(X,y)
+
+    gdp = st.number_input("Enter GDP per capita")
+
+    if st.button("Predict"):
+        pred = model.predict([[gdp]])
+        st.success(f"Predicted Inequality: {round(pred[0],2)}")
+
+# ===============================
+# 📊 AUTO INSIGHTS + PDF
+# ===============================
+elif opt=="Report":
+    st.subheader("Auto Insights")
+
+    avg = round(df.gini_reported.mean(),2)
+    mx = round(df.gini_reported.max(),2)
+    mn = round(df.gini_reported.min(),2)
+
+    text = f"""
+    Global income inequality analysis shows that average inequality is {avg}.
+    Maximum inequality is {mx} and minimum is {mn}.
+    Inequality varies across countries and regions and is not directly dependent on GDP or population.
+    """
+
+    st.write(text)
+
+    # PDF
+    if st.button("Download PDF"):
+        doc = SimpleDocTemplate("report.pdf")
+        styles = getSampleStyleSheet()
+        story = [Paragraph(text, styles["Normal"])]
+        doc.build(story)
+
+        with open("report.pdf","rb") as f:
+            st.download_button("Download", f, "report.pdf")
