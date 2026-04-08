@@ -11,3 +11,4 @@ streamlit-lottie
 requests
 speechrecognition
 pyaudio
+streamlit-lottie
