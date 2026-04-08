@@ -1,13 +1,9 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.express as px
 from sklearn.linear_model import LinearRegression
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
-from streamlit_lottie import st_lottie
-import requests
 import time
 
 st.set_page_config(page_title="Global Inequality", layout="wide")
@@ -31,21 +27,9 @@ if not st.session_state.login:
     st.stop()
 
 # ===============================
-# LOAD LOTTIE
+# TITLE
 # ===============================
-def load_lottie(url):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-# ===============================
-# ANIMATION
-# ===============================
-lottie = load_lottie("https://assets2.lottiefiles.com/packages/lf20_jcikwtux.json")
-st_lottie(lottie, height=200)
-
-st.markdown("<h1 style='text-align:center;'>🌍 Global Income Inequality Dashboard</h1>", unsafe_allow_html=True)
+st.title("🌍 Global Income Inequality Dashboard")
 
 # ===============================
 # LOAD DATA
@@ -184,7 +168,7 @@ elif opt=="ML Prediction":
         st.success(f"Predicted Inequality: {round(pred[0],2)}")
 
 # ===============================
-# REPORT + SMART INSIGHTS
+# REPORT + INSIGHTS
 # ===============================
 elif opt=="Report":
     st.subheader("Smart Insights")
