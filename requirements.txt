@@ -6,9 +6,3 @@ matplotlib
 seaborn
 openpyxl
 scikit-learn
-reportlab
-streamlit-lottie
-requests
-speechrecognition
-pyaudio
-streamlit-lottie
